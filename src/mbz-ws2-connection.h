@@ -38,12 +38,47 @@ struct _MbzWs2Connection {
 	GObject parent_instance;
 	
 	MbzWs2ConnectionPrivate *priv;
-}
+};
 
 struct _MbzWs2ConnectionClass {
 	GObjectClass parent_class;
-}
+};
 
 GType mbz_ws2_connection_get_type(void);
+
+/**
+ * mbz_ws2_connection_new:
+ * @user_agent: The HTTP user agent to identify your application as. See
+ * http://wiki.musicbrainz.org/XML_Web_Service/Rate_Limiting for details.
+ *
+ * Create a new webservice connection using the default settings, which is:
+ * - Connect to http://musicbrainz.org/ws/2
+ * - Use a ratelimiter configured for 1 request per second.
+ *
+ * Returns: (transfer full): The connection object, which must be dereferenced
+ * when you are finished with it.
+ * Since: 1.0
+ */
+MbzWs2Connection *mbz_ws2_connection_new(const gchar *user_agent);
+
+/**
+ * mbz_ws2_connection_new_server:
+ * @user_agent: The HTTP user agent to identify your application as.
+ * @base_uri: The base URI for the Musicbrainz webservice (version 2).
+ * @ratelimit_period: The time between successive webservice requests (in ms).
+ * Use 0 to disable the ratelimiter completely.
+ *
+ * Create a new webservice connection to a non-standard server. The primary
+ * purpose of this function is to allow connections to a local Musicbrainz
+ * mirror server that mas ratelimiting disabled.
+ *
+ * Returns: (transfer full): The connection object, which must be dereferenced
+ * when you are finished with it.
+ * Since: 1.0
+ */
+MbzWs2Connection *mbz_ws2_connection_new_server(
+	const gchar *user_agent,
+	const gchar *base_uri,
+	guint ratelimit_period);
 
 #endif /* MBZ_WS2_CONNECTION_H */
