@@ -178,9 +178,9 @@ MbzWs2Connection *mbz_ws2_connection_new_server(
 	
 	con = g_object_new(MBZ_WS2_TYPE_CONNECTION,
 		"user-agent", user_agent,
-		"base-uri", base_uri);
-	
-	/* TODO: do something with ratelimit_period */
+		"base-uri", base_uri,
+		"ratelimit-period", ratelimit_period,
+		NULL);
 	
 	return con;
 }

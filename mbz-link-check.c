@@ -2,19 +2,25 @@
 
 int main(int argc, char *argv[]) {
 	MbzWs2Connection *con;
-	gchar *tmp;
+	gchar *user_agent, *base_uri;
+	guint ratelimit_period;
 	
 	g_type_init();
 	
-	con = mbz_ws2_connection_new_server("MbzLinkCheck/1", "http://192.168.112.67:5000/ws/2", 0);
+	con = mbz_ws2_connection_new("MbzLinkCheck/1");
 	
-	g_object_get(con, "user-agent", &tmp, NULL);
-	g_print("User Agent: %s\n", tmp);
-	g_free(tmp);
-	
-	g_object_get(con, "base-uri", &tmp, NULL);
-	g_print("Base URI: %s\n", tmp);
-	g_free(tmp);
+	g_object_get(con,
+		"user-agent", &user_agent,
+		"base-uri", &base_uri,
+		"ratelimit-period", &ratelimit_period,
+		NULL);
+
+	g_print("User Agent: %s\n", user_agent);
+	g_print("Base URI: %s\n", base_uri);
+	g_print("Ratelimit Period: %u\n", ratelimit_period);
+
+	g_free(user_agent);
+	g_free(base_uri);
 	
 	g_object_unref(con);
 	
