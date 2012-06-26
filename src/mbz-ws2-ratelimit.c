@@ -32,6 +32,13 @@ struct _MbzWs2RatelimitPrivate {
 
 #define MBZ_WS2_RATELIMIT_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE((obj), MBZ_WS2_TYPE_RATELIMIT, MbzWs2RatelimitPrivate))
 
+typedef struct _RatelimitCallback RatelimitCallback;
+
+struct _RatelimitCallback {
+	MbzWs2RatelimitCallback function;
+	gpointer user_data;
+};
+
 enum {
 	RATELIMIT_PERIOD = 1,
 	RATELIMIT_BURST,
@@ -157,4 +164,101 @@ guint mbz_ws2_ratelimit_get_period(MbzWs2Ratelimit *self)
 guint mbz_ws2_ratelimit_get_burst(MbzWs2Ratelimit *self)
 {
 	return self->priv->burst;
+}
+
+static gboolean ratelimit_run_immediate(gpointer data) {
+	RatelimitCallback *rc = data;
+	
+	rc->function(rc->user_data);
+	
+	g_free(rc);
+	
+	return FALSE;
+}
+
+static void ratelimit_start_timer(MbzWs2Ratelimit *self);
+
+static gboolean ratelimit_next(gpointer user_data)
+{
+	MbzWs2Ratelimit *self = user_data;
+	
+	g_debug("Timer tick\n");
+	
+	/* If the oldest element in out_queue is more than period * burst old,
+	 * remove it. */
+	if (g_queue_get_length(&self->priv->out_queue) > 0) {
+		if (GPOINTER_TO_UINT(g_queue_peek_head(&self->priv->out_queue))
+					+ self->priv->burst_period
+				<= g_get_monotonic_time()/1000) {
+			g_debug("Dropping old request from out_queue\n");
+			g_queue_pop_head(&self->priv->out_queue);
+		}
+	}
+	
+	/* Do more requests if space is available in out_queue */
+	while (g_queue_get_length(&self->priv->out_queue) < self->priv->burst
+			&& g_queue_get_length(&self->priv->in_queue) > 0) {
+		g_debug("Performing queued request\n");
+		RatelimitCallback *rc = g_queue_pop_head(&self->priv->in_queue);
+		
+		rc->function(rc->user_data);
+		
+		g_free(rc);
+	}
+	
+	g_debug("Out Queue: %u, In Queue: %u\n",
+		g_queue_get_length(&self->priv->out_queue),
+		g_queue_get_length(&self->priv->in_queue));
+	
+	/* Queue the next timer tick if out_queue isn't empty */
+	if (g_queue_get_length(&self->priv->out_queue) > 0) {
+		ratelimit_start_timer(self);
+	} else {
+		g_debug("Stopping timer\n");
+		self->priv->active = FALSE;
+	}
+	
+	return FALSE;
+}
+
+static void ratelimit_start_timer(MbzWs2Ratelimit *self)
+{
+	self->priv->active = TRUE;
+	guint delay = MAX(
+		self->priv->period,
+		self->priv->burst_period -
+			(g_get_monotonic_time()/1000 -
+			GPOINTER_TO_UINT(g_queue_peek_head(&self->priv->out_queue))));
+	
+	g_timeout_add(delay, ratelimit_next, self);
+}
+
+void mbz_ws2_ratelimit_queue(
+	MbzWs2Ratelimit *self,
+	MbzWs2RatelimitCallback function,
+	gpointer user_data)
+{
+	RatelimitCallback *rc = g_new(RatelimitCallback, 1);
+	rc->function = function;
+	rc->user_data = user_data;
+	
+	/* If there is space in the out_queue, do the request immediately. */
+	if (g_queue_get_length(&self->priv->out_queue) < self->priv->burst) {
+		g_debug("Performing immediate request\n");
+		g_main_context_invoke(NULL, ratelimit_run_immediate, rc);
+		g_queue_push_tail(&self->priv->out_queue, GUINT_TO_POINTER(g_get_monotonic_time()/1000));
+	} else {
+		g_debug("Queueing request\n");
+		g_queue_push_tail(&self->priv->in_queue, rc);
+	}
+	
+	g_debug("Out Queue: %u, In Queue: %u\n",
+		g_queue_get_length(&self->priv->out_queue),
+		g_queue_get_length(&self->priv->in_queue));
+	
+	/* Start the timer if it wasn't previously running. */
+	if (!self->priv->active) {
+		g_debug("Starting timer\n");
+		ratelimit_start_timer(self);
+	}
 }

@@ -47,6 +47,14 @@ struct _MbzWs2RatelimitClass {
 GType mbz_ws2_ratelimit_get_type(void);
 
 /**
+ * MbzWs2RatelimitCallback:
+ * @user_data: Data passed to the function.
+ *
+ * The type of the callback function passed to mbz_ws2_ratelimit_queue().
+ */
+typedef void (*MbzWs2RatelimitCallback)(gpointer user_data);
+
+/**
  * mbz_ws2_ratelimit_new:
  *
  * Create a ratelimiter using the default parameters.
@@ -85,4 +93,17 @@ guint mbz_ws2_ratelimit_get_period(MbzWs2Ratelimit *self);
  * Since: 1.0
  */
 guint mbz_ws2_ratelimit_get_burst(MbzWs2Ratelimit *self);
+
+/**
+ * mbz_ws2_ratelimit_queue:
+ * @function: The function that will be called.
+ * @user_data: Data to pass as the argument to @function.
+ *
+ * Enqueue the provided callback function to run in the next available time
+ * slot on the rate limiter.
+ */
+void mbz_ws2_ratelimit_queue(
+	MbzWs2Ratelimit *self,
+	MbzWs2RatelimitCallback function,
+	gpointer user_data);
 #endif /* MBZ_WS2_RATELIMIT_H */
