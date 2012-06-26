@@ -32,6 +32,7 @@ struct _MbzWs2ConnectionPrivate {
 	MbzWs2Ratelimit *ratelimiter;
 	gchar *username;
 	gchar *password;
+	SoupSession *session;
 	guint ratelimit_period;
 };
 
@@ -127,6 +128,8 @@ static void connection_constructed(GObject *object)
 	self->priv->ratelimiter = g_object_new(MBZ_WS2_TYPE_RATELIMIT,
 		"period", self->priv->ratelimit_period,
 		NULL);
+
+	self->priv->session = soup_session_async_new();
 }
 
 static void connection_dispose(GObject *object)
@@ -136,6 +139,9 @@ static void connection_dispose(GObject *object)
 	g_object_unref(self->priv->ratelimiter);
 	self->priv->ratelimiter = NULL;
 	
+	g_object_unref(self->priv->session);
+	self->priv->session = NULL;
+
 	G_OBJECT_CLASS(mbz_ws2_connection_parent_class)->dispose(object);
 }
 
