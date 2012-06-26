@@ -90,6 +90,7 @@ MbzWs2Connection *mbz_ws2_connection_new_server(
  *
  * Returns: (transfer none): The user agent string, memory owned by the
  * connection.
+ * Since: 1.0
  */
 const gchar *mbz_ws2_connection_get_user_agent(MbzWs2Connection *self);
 
@@ -99,6 +100,7 @@ const gchar *mbz_ws2_connection_get_user_agent(MbzWs2Connection *self);
  * Get the endpoint URI that this connection is configured to access.
  *
  * Returns: (transfer none): The endpoint URI, memory owned by the connection.
+ * Since: 1.0
  */
 const gchar *mbz_ws2_connection_get_endpoint_uri(MbzWs2Connection *self);
 
@@ -113,5 +115,20 @@ const gchar *mbz_ws2_connection_get_endpoint_uri(MbzWs2Connection *self);
  * Since: 1.0
  */
 MbzWs2Ratelimit *mbz_ws2_connection_get_ratelimiter(MbzWs2Connection *self);
+
+/**
+ * mbz_ws2_connection_set_authentication:
+ * @username: The username
+ * @password: The password
+ *
+ * Set a username and password to use when requesting resources that require
+ * authentication, e.g. user tags or collections.
+ *
+ * Since: 1.0
+ */
+void mbz_ws2_connection_set_authentication(
+		MbzWs2Connection *self,
+		const gchar *username,
+		const gchar *password);
 
 #endif /* MBZ_WS2_CONNECTION_H */

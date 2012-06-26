@@ -30,6 +30,8 @@ struct _MbzWs2ConnectionPrivate {
 	gchar *endpoint_uri_string;
 	SoupURI *base_uri;
 	MbzWs2Ratelimit *ratelimiter;
+	gchar *username;
+	gchar *password;
 	guint ratelimit_period;
 };
 
@@ -40,6 +42,8 @@ enum {
 	CONNECTION_ENDPOINT_URI,
 	CONNECTION_RATELIMIT_PERIOD,
 	CONNECTION_RATELIMITER,
+	CONNECTION_USERNAME,
+	CONNECTION_PASSWORD,
 	CONNECTION_N_PROPERTIES,
 };
 
@@ -62,6 +66,17 @@ static void connection_set_property(GObject *object, guint property_id, const GV
 		break;
 	case CONNECTION_RATELIMIT_PERIOD:
 		self->priv->ratelimit_period = g_value_get_uint(value);
+		g_debug("MbzWs2Connection:ratelimit-period:%u\n", self->priv->ratelimit_period);
+		break;
+	case CONNECTION_USERNAME:
+		g_free(self->priv->username);
+		self->priv->username = g_value_dup_string(value);
+		g_debug("MbzWs2Connection:username:%s\n", self->priv->username);
+		break;
+	case CONNECTION_PASSWORD:
+		g_free(self->priv->password);
+		self->priv->password = g_value_dup_string(value);
+		g_debug("MbzWs2Connection:password:%s\n", self->priv->username);
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -85,6 +100,12 @@ static void connection_get_property(GObject *object, guint property_id, GValue *
 		break;
 	case CONNECTION_RATELIMITER:
 		g_value_set_object(value, self->priv->ratelimiter);
+		break;
+	case CONNECTION_USERNAME:
+		g_value_set_string(value, self->priv->username);
+		break;
+	case CONNECTION_PASSWORD:
+		g_value_set_string(value, self->priv->password);
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -124,6 +145,9 @@ static void connection_finalize(GObject *object)
 	
 	g_free(self->priv->user_agent);
 	g_free(self->priv->endpoint_uri_string);
+	g_free(self->priv->username);
+	g_free(self->priv->password);
+
 	if (self->priv->base_uri != NULL) {
 		soup_uri_free(self->priv->base_uri);
 		self->priv->base_uri = NULL;
@@ -200,6 +224,32 @@ static void mbz_ws2_connection_class_init(MbzWs2ConnectionClass *klass)
 		MBZ_WS2_TYPE_RATELIMIT,
 		G_PARAM_READABLE);
 	
+	/**
+	 * MbzWs2Connection:username:
+	 *
+	 * The username to use when retrieving resources that require
+	 * authentication.
+	 */
+	connection_properties[CONNECTION_USERNAME] = g_param_spec_string(
+		"username",
+		"Username",
+		"The username for retrieving authenticated resources",
+		NULL,	/* default */
+		G_PARAM_READWRITE);
+
+	/**
+	 * MbzWs2Connection:password:
+	 *
+	 * The password to use when retrieving resources that require
+	 * authentication.
+	 */
+	connection_properties[CONNECTION_PASSWORD] = g_param_spec_string(
+		"password",
+		"Password",
+		"The password for retrieving authenticated resources",
+		NULL,	/* default */
+		G_PARAM_READWRITE);
+
 	g_object_class_install_properties(gobject_class, CONNECTION_N_PROPERTIES, connection_properties);
 }
 
@@ -254,4 +304,16 @@ MbzWs2Ratelimit *mbz_ws2_connection_get_ratelimiter(MbzWs2Connection *self)
 	g_object_ref(rl);
 	
 	return rl;
+}
+
+void mbz_ws2_connection_set_authentication(
+		MbzWs2Connection *self,
+		const gchar *username,
+		const gchar *password)
+{
+	g_free(self->priv->username);
+	g_free(self->priv->password);
+
+	self->priv->username = g_strdup(username);
+	self->priv->password = g_strdup(password);
 }
