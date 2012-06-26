@@ -6,7 +6,9 @@ noinst_PROGRAMS = mbz-link-check
 
 libmbz_ws2_la_SOURCES = \
 	src/mbz-ws2-connection.h \
-	src/mbz-ws2-connection.c
+	src/mbz-ws2-connection.c \
+	src/mbz-ws2-ratelimit.h \
+	src/mbz-ws2-ratelimit.c
 libmbz_ws2_la_CFLAGS = \
 	$(MBZ_WS2_CFLAGS)
 libmbz_ws2_la_LIBADD = \

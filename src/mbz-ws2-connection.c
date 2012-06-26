@@ -19,13 +19,17 @@
 
 #include "mbz-ws2-connection.h"
 
+#include "mbz-ws2-ratelimit.h"
+
 #include <libsoup/soup.h>
 
 G_DEFINE_TYPE(MbzWs2Connection, mbz_ws2_connection, G_TYPE_OBJECT)
 
 struct _MbzWs2ConnectionPrivate {
 	gchar *user_agent;
+	gchar *endpoint_uri_string;
 	SoupURI *base_uri;
+	MbzWs2Ratelimit *ratelimiter;
 	guint ratelimit_period;
 };
 
@@ -33,8 +37,9 @@ struct _MbzWs2ConnectionPrivate {
 
 enum {
 	CONNECTION_USER_AGENT = 1,
-	CONNECTION_BASE_URI,
+	CONNECTION_ENDPOINT_URI,
 	CONNECTION_RATELIMIT_PERIOD,
+	CONNECTION_RATELIMITER,
 	CONNECTION_N_PROPERTIES,
 };
 
@@ -50,11 +55,10 @@ static void connection_set_property(GObject *object, guint property_id, const GV
 		self->priv->user_agent = g_value_dup_string(value);
 		g_debug("MbzWs2Connection:user-agent:%s\n", self->priv->user_agent);
 		break;
-	case CONNECTION_BASE_URI:
-		if (self->priv->base_uri != NULL)
-			soup_uri_free(self->priv->base_uri);
-		self->priv->base_uri = soup_uri_new(g_value_get_string(value));
-		g_debug("MbzWs2Connection:base-uri:%s\n", g_value_get_string(value));
+	case CONNECTION_ENDPOINT_URI:
+		g_free(self->priv->endpoint_uri_string);
+		self->priv->endpoint_uri_string = g_value_dup_string(value);
+		g_debug("MbzWs2Connection:endpoint-uri:%s\n", self->priv->endpoint_uri_string);
 		break;
 	case CONNECTION_RATELIMIT_PERIOD:
 		self->priv->ratelimit_period = g_value_get_uint(value);
@@ -73,11 +77,14 @@ static void connection_get_property(GObject *object, guint property_id, GValue *
 	case CONNECTION_USER_AGENT:
 		g_value_set_string(value, self->priv->user_agent);
 		break;
-	case CONNECTION_BASE_URI:
-		g_value_take_string(value, soup_uri_to_string(self->priv->base_uri, FALSE));
+	case CONNECTION_ENDPOINT_URI:
+		g_value_set_string(value, self->priv->endpoint_uri_string);
 		break;
 	case CONNECTION_RATELIMIT_PERIOD:
 		g_value_set_uint(value, self->priv->ratelimit_period);
+		break;
+	case CONNECTION_RATELIMITER:
+		g_value_set_object(value, self->priv->ratelimiter);
 		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -89,9 +96,40 @@ static void connection_constructed(GObject *object)
 {
 	MbzWs2Connection *self = MBZ_WS2_CONNECTION(object);
 	
+	if (self->priv->user_agent == NULL)
+		g_error("User agent string was not set\n");
+	
 	G_OBJECT_CLASS(mbz_ws2_connection_parent_class)->constructed(object);
+	
+	self->priv->base_uri = soup_uri_new(self->priv->endpoint_uri_string);
 
-	/* TODO: Set up the ratelimiter here */
+	self->priv->ratelimiter = g_object_new(MBZ_WS2_TYPE_RATELIMIT,
+		"period", self->priv->ratelimit_period,
+		NULL);
+}
+
+static void connection_dispose(GObject *object)
+{
+	MbzWs2Connection *self = MBZ_WS2_CONNECTION(object);
+	
+	g_object_unref(self->priv->ratelimiter);
+	self->priv->ratelimiter = NULL;
+	
+	G_OBJECT_CLASS(mbz_ws2_connection_parent_class)->dispose(object);
+}
+
+static void connection_finalize(GObject *object)
+{
+	MbzWs2Connection *self = MBZ_WS2_CONNECTION(object);
+	
+	g_free(self->priv->user_agent);
+	g_free(self->priv->endpoint_uri_string);
+	if (self->priv->base_uri != NULL) {
+		soup_uri_free(self->priv->base_uri);
+		self->priv->base_uri = NULL;
+	}
+	
+	G_OBJECT_CLASS(mbz_ws2_connection_parent_class)->finalize(object);
 }
 
 static void mbz_ws2_connection_class_init(MbzWs2ConnectionClass *klass)
@@ -103,6 +141,8 @@ static void mbz_ws2_connection_class_init(MbzWs2ConnectionClass *klass)
 	gobject_class->set_property = connection_set_property;
 	gobject_class->get_property = connection_get_property;
 	gobject_class->constructed = connection_constructed;
+	gobject_class->dispose = connection_dispose;
+	gobject_class->finalize = connection_finalize;
 	
 	/**
 	 * MbzWs2Connection:user-agent:
@@ -119,25 +159,25 @@ static void mbz_ws2_connection_class_init(MbzWs2ConnectionClass *klass)
 		G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE);
 	
 	/**
-	 * MbzWs2Connection:base-uri:
+	 * MbzWs2Connection:endpoint-uri:
 	 *
-	 * The base URI for the Musicbrainz webservice. By default, this will
-	 * access the official webservice at http://musicbrainz.org/ws/2, but
-	 * it can be overridden to allow using a mirror server.
+	 * The endpoint URI for the Musicbrainz webservice. By default, this
+	 * will access the official webservice at http://musicbrainz.org/ws/2,
+	 * but it can be overridden to allow using a mirror server.
 	 */
-	connection_properties[CONNECTION_BASE_URI] = g_param_spec_string(
-		"base-uri",
-		"Base URI",
-		"The base URI for the Musicbrainz webservice (version 2)",
+	connection_properties[CONNECTION_ENDPOINT_URI] = g_param_spec_string(
+		"endpoint-uri",
+		"Endpoint URI",
+		"The endpoint URI for the Musicbrainz webservice (version 2)",
 		"http://musicbrainz.org/ws/2", /* default */
 		G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE);
 	
 	/**
-	 * MBWs2Connection:ratelimit-period:
+	 * MbzWs2Connection:ratelimit-period:
 	 *
 	 * The period between ratelimited requests to the Musicbrainz
-	 * webservice, in milliseconds. The default is 1000, and it can be set
-	 * to 0 to disable the ratelimiter.
+	 * webservice, in milliseconds. The default is 1100 (1000 plus a fudge
+	 * factor), and it can be set to 0 to disable the ratelimiter.
 	 */
 	connection_properties[CONNECTION_RATELIMIT_PERIOD] = g_param_spec_uint(
 		"ratelimit-period",
@@ -145,8 +185,20 @@ static void mbz_ws2_connection_class_init(MbzWs2ConnectionClass *klass)
 		"Time between webservice calls (ms)",
 		0,		/* minimum */
 		G_MAXUINT,	/* maximum */
-		1000,		/* default */
+		1100,		/* default */
 		G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE);
+	
+	/**
+	 * MbzWs2Connection:ratelimiter:
+	 *
+	 * The #MbzWs2Ratelimit object used by the connection.
+	 */
+	connection_properties[CONNECTION_RATELIMITER] = g_param_spec_object(
+		"ratelimiter",
+		"Ratelimiter",
+		"The MbzWs2Ratelimit object used by this connection",
+		MBZ_WS2_TYPE_RATELIMIT,
+		G_PARAM_READABLE);
 	
 	g_object_class_install_properties(gobject_class, CONNECTION_N_PROPERTIES, connection_properties);
 }
@@ -169,7 +221,7 @@ MbzWs2Connection *mbz_ws2_connection_new(const gchar *user_agent)
 
 MbzWs2Connection *mbz_ws2_connection_new_server(
 	const gchar *user_agent,
-	const gchar *base_uri,
+	const gchar *endpoint_uri,
 	guint ratelimit_period)
 {
 	MbzWs2Connection *con;
@@ -178,9 +230,28 @@ MbzWs2Connection *mbz_ws2_connection_new_server(
 	
 	con = g_object_new(MBZ_WS2_TYPE_CONNECTION,
 		"user-agent", user_agent,
-		"base-uri", base_uri,
+		"endpoint-uri", endpoint_uri,
 		"ratelimit-period", ratelimit_period,
 		NULL);
 	
 	return con;
+}
+
+const gchar *mbz_ws2_connection_get_user_agent(MbzWs2Connection *self)
+{
+	return self->priv->user_agent;
+}
+
+const gchar *mbz_ws2_connection_get_endpoint_uri(MbzWs2Connection *self)
+{
+	return self->priv->endpoint_uri_string;
+}
+
+MbzWs2Ratelimit *mbz_ws2_connection_get_ratelimiter(MbzWs2Connection *self)
+{
+	MbzWs2Ratelimit *rl = self->priv->ratelimiter;
+	
+	g_object_ref(rl);
+	
+	return rl;
 }

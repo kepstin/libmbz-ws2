@@ -22,6 +22,8 @@
 
 #include <glib-object.h>
 
+typedef struct _MbzWs2Ratelimit MbzWs2Ratelimit;
+
 #define MBZ_WS2_TYPE_CONNECTION			(mbz_ws2_connection_get_type())
 #define MBZ_WS2_CONNECTION(obj)			(G_TYPE_CHECK_INSTANCE_CAST((obj), MBZ_WS2_TYPE_CONNECTION, MbzWs2Connection))
 #define MBZ_WS2_IS_CONNECTION(obj)		(G_TYPE_CHECK_INSTANCE_TYPE((obj), MBZ_WS2_TYPE_CONNECTION))
@@ -53,9 +55,9 @@ GType mbz_ws2_connection_get_type(void);
  *
  * Create a new webservice connection using the default settings, which is:
  * - Connect to http://musicbrainz.org/ws/2
- * - Use a ratelimiter configured for 1 request per second.
+ * - Use a ratelimiter configured for ~1 request per second.
  *
- * Returns: (transfer full): The connection object, which must be dereferenced
+ * Returns: (transfer full): The connection object, which must be unreferenced
  * when you are finished with it.
  * Since: 1.0
  */
@@ -64,7 +66,7 @@ MbzWs2Connection *mbz_ws2_connection_new(const gchar *user_agent);
 /**
  * mbz_ws2_connection_new_server:
  * @user_agent: The HTTP user agent to identify your application as.
- * @base_uri: The base URI for the Musicbrainz webservice (version 2).
+ * @endpoint_uri: The endpoint URI for the Musicbrainz webservice (version 2).
  * @ratelimit_period: The time between successive webservice requests (in ms).
  * Use 0 to disable the ratelimiter completely.
  *
@@ -72,13 +74,44 @@ MbzWs2Connection *mbz_ws2_connection_new(const gchar *user_agent);
  * purpose of this function is to allow connections to a local Musicbrainz
  * mirror server that mas ratelimiting disabled.
  *
- * Returns: (transfer full): The connection object, which must be dereferenced
+ * Returns: (transfer full): The connection object, which must be unreferenced
  * when you are finished with it.
  * Since: 1.0
  */
 MbzWs2Connection *mbz_ws2_connection_new_server(
 	const gchar *user_agent,
-	const gchar *base_uri,
+	const gchar *endpoint_uri,
 	guint ratelimit_period);
+
+/**
+ * mbz_ws2_connection_get_user_agent:
+ *
+ * Get the configured user agent string for the connection.
+ *
+ * Returns: (transfer none): The user agent string, memory owned by the
+ * connection.
+ */
+const gchar *mbz_ws2_connection_get_user_agent(MbzWs2Connection *self);
+
+/**
+ * mbz_ws2_connection_get_endpoint_uri:
+ *
+ * Get the endpoint URI that this connection is configured to access.
+ *
+ * Returns: (transfer none): The endpoint URI, memory owned by the connection.
+ */
+const gchar *mbz_ws2_connection_get_endpoint_uri(MbzWs2Connection *self);
+
+/**
+ * mbz_ws2_connection_get_ratelimiter:
+ *
+ * Get the ratelimiter used by the webservice connection.
+ *
+ * Returns: (transfer full): The ratelimiter, with an additional reference. You
+ * can continue to use it even after the connection is ureferenced. You must
+ * unreference it when you are done with it.
+ * Since: 1.0
+ */
+MbzWs2Ratelimit *mbz_ws2_connection_get_ratelimiter(MbzWs2Connection *self);
 
 #endif /* MBZ_WS2_CONNECTION_H */
