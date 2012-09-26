@@ -17,9 +17,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mbz-ws2-connection.h"
+#include "connection.h"
 
-#include "mbz-ws2-ratelimit.h"
+#include "ratelimit.h"
 
 #include <libsoup/soup.h>
 

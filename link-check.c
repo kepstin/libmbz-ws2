@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "src/mbz-ws2-connection.h"
-#include "src/mbz-ws2-ratelimit.h"
+#include "src/connection.h"
+#include "src/ratelimit.h"
 
 int main(int argc, char *argv[]) {
 	MbzWs2Connection *con;

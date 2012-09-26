@@ -1,6 +1,6 @@
 AC_PREREQ([2.69])
 AC_INIT([libmbz-ws2], [0.1], [calvin.walton@kepstin.ca])
-AC_CONFIG_SRCDIR([src/mbz-ws2-connection.h])
+AC_CONFIG_SRCDIR([src/connection.h])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([m4])

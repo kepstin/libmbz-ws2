@@ -17,7 +17,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "mbz-ws2-ratelimit.h"
+#include "ratelimit.h"
 
 G_DEFINE_TYPE(MbzWs2Ratelimit, mbz_ws2_ratelimit, G_TYPE_OBJECT)
 
