@@ -1,0 +1,2 @@
+/* Location of source directory. */
+#undef TOP_SRCDIR

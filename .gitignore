@@ -1,8 +1,10 @@
 .deps
+.dirstamp
 .libs
 Makefile
 Makefile.in
 stamp-h1
+stamp-h2
 /aclocal.m4
 /autom4te.cache
 /build-aux
@@ -11,7 +13,8 @@ stamp-h1
 /libtool
 /m4/libtool.m4
 /m4/lt*.m4
-/mbz-link-check
+/link-check
+/test-suite.log
 *.la
 *.lo
 *.o
